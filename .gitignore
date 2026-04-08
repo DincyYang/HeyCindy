@@ -1,15 +1,15 @@
-# Only allow Python files
-*
-
-# But keep .py files
-!*.py
-
-# Also allow folders (important!)
-!*/
-
-# Ignore common junk
+# Ignore virtual env and system files
+.venv/
+.vscode/
 __pycache__/
+*.pyc
 *.log
 *.db
 .env
-.venv/
+
+# Ignore local docs
+PROJECT_LOG.md
+Running.md
+
+# Ignore assets if needed
+Hey-Cindy_en_mac_v4_0_0/
