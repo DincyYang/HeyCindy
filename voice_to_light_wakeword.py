@@ -1,6 +1,6 @@
 # voice_to_light_wakeword.py
 from wake_word import WakeWordDetector
-from command import execute
+from command import execute, speak
 from command_listener import listen_for_command
 import sys
 import time
@@ -9,8 +9,7 @@ import simpleaudio as sa
 import logging
 import threading
 from normalizer import normalize_command
-from cloud_client import send_command
-import os
+from decision import decide_from_result
 
 # ========= Configuration =========
 ACCESS_KEY = "b9uFY0Z2mfDVvhNNa9p3DxHzEWL5T/yHaS+NqIO7/KQBoBmKWJJugA=="
@@ -77,43 +76,51 @@ def handle_wake(detector: WakeWordDetector):
         f"reason={result.reason} cleaned={result.cleaned_text!r}"
     )
 
-    # 3) on/off 执行
-    if result.normalized in ("on", "off"):
-        print(f"👉 Executing: {result.normalized}")
+    # 3) 决策层
+    decision = decide_from_result(result)
 
-        # 本地执行
-        should_continue = execute(result.normalized)
+    print(
+        f"🧭 decision: action={decision.action} "
+        f"command={decision.command} reason={decision.reason}"
+    )
+    logging.info(
+        f"Decision: action={decision.action} "
+        f"command={decision.command} reason={decision.reason}"
+    )
 
-        # 云端记录（如果 cloud_client 还不支持这些参数，先只发 result.normalized）
-        try:
-            resp = send_command(
-                result.normalized,
-                raw_text=raw_text,
-                confidence=result.confidence,
-                reason=result.reason,
-                source="voice"
-            )
-            print("☁️ Cloud recorded:", resp)
-        except TypeError:
-            # 兼容旧版 send_command(cmd)
-            resp = send_command(result.normalized)
-            print("☁️ Cloud recorded (legacy):", resp)
-        except Exception as e:
-            print("☁️ Cloud send failed:", e)
+    # 4) 根据决策执行
+    if decision.action == "execute":
+        print(f"👉 Executing: {decision.command}")
+        should_continue = execute(decision.command)
 
         if should_continue is False:
             sys.exit(0)
 
-    # 4) unknown 不执行，只记录
-    else:
-        print("⚠️ No action taken (unknown).")
+    elif decision.action == "clarify":
+        print(f"❓ Clarification needed: {decision.message}")
         logging.warning(
-            f"Unknown command: raw={raw_text!r} cleaned={result.cleaned_text!r} reason={result.reason}"
+            f"Clarify command: raw={raw_text!r} cleaned={result.cleaned_text!r} "
+            f"reason={result.reason}"
+        )
+        speak(decision.message)
+
+    elif decision.action == "reject":
+        print(f"⛔ Rejected: {decision.message}")
+        logging.warning(
+            f"Rejected command: raw={raw_text!r} cleaned={result.cleaned_text!r} "
+            f"reason={result.reason}"
+        )
+        speak(decision.message)
+
+    else:
+        print("⚠️ No action taken.")
+        logging.warning(
+            f"Ignored command: raw={raw_text!r} cleaned={result.cleaned_text!r} "
+            f"reason={result.reason}"
         )
 
     # 5) 恢复 wake word 监听
     detector.pause_event.clear()
-
 
 def main():
     print("Voice to light with wake word started")
