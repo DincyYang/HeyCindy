@@ -47,7 +47,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Set environment variables
-export HEY_CINDY_CLOUD=http://3.85.92.201:8000
+export HEY_CINDY_CLOUD=http://3.234.157.34:8000
 export HEY_CINDY_TOKEN=cindy-dev-token-123
 
 # Start local dashboard (web UI)
@@ -78,7 +78,7 @@ pytest --cov=. --cov-report=term-missing
 - [x] Cloud API (FastAPI + AWS EC2)
 - [x] Local dashboard
 - [x] Unit tests + CI (GitHub Actions)
-- [ ] PostgreSQL + Redis (Week 2)
-- [ ] React frontend + WebSocket (Week 5–6)
-- [ ] LLM fallback for ambiguous commands (Week 9)
-- [ ] Physical smart plug integration (Week 10)
+- [ ] PostgreSQL + Redis
+- [ ] React frontend + WebSocket
+- [ ] LLM fallback for ambiguous commands
+- [ ] Physical smart plug integration
