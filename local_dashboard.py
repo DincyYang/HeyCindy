@@ -4,7 +4,7 @@ import time
 import requests
 from flask import Flask, jsonify, render_template_string, request
 
-CLOUD = os.environ.get("HEY_CINDY_CLOUD", "http://3.85.92.201:8000")
+CLOUD = os.environ.get("HEY_CINDY_CLOUD", "http://3.234.157.34:8000")
 TOKEN = os.environ.get("HEY_CINDY_TOKEN", "cindy-dev-token-123")
 
 app = Flask(__name__)

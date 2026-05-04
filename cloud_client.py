@@ -3,7 +3,7 @@ import os
 import requests
 from typing import Any, Dict, Optional
 
-CLOUD_BASE = os.environ.get("HEY_CINDY_CLOUD", "http://3.85.92.201:8000").rstrip("/")
+CLOUD_BASE = os.environ.get("HEY_CINDY_CLOUD", "http://3.234.157.34:8000").rstrip("/")
 TOKEN = os.environ.get("HEY_CINDY_TOKEN", "cindy-dev-token-123")
 
 DEFAULT_TIMEOUT_S = 5
