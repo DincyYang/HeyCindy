@@ -1,12 +1,13 @@
 # normalizer.py
 import os
+import json
 from dataclasses import dataclass
 from typing import Optional
 import anthropic
 
 @dataclass(frozen=True)
 class NormalizedResult:
-    normalized: str     # "on" | "off" | "unknown"
+    normalized: str
     confidence: float
     reason: str
     cleaned_text: str
@@ -31,7 +32,7 @@ def normalize_command(raw_text: Optional[str]) -> NormalizedResult:
                 "content": f"""You are a smart home assistant. The user just gave a voice command.
 Your job is to classify the command into one of three categories:
 - "on": user wants to turn the light ON
-- "off": user wants to turn the light OFF  
+- "off": user wants to turn the light OFF
 - "unknown": command is unclear, unrelated, or contradictory
 
 User said: "{raw_text}"
@@ -42,15 +43,23 @@ Reply with ONLY a JSON object in this exact format, nothing else:
         ]
     )
 
-    import json
     try:
-        result = json.loads(message.content[0].text)
+        text = message.content[0].text.strip()
+        if "```" in text:
+            parts = text.split("```")
+            for part in parts:
+                part = part.strip()
+                if part.startswith("json"):
+                    part = part[4:].strip()
+                if part.startswith("{"):
+                    text = part
+                    break
+        result = json.loads(text)
         return NormalizedResult(
             normalized=result.get("command", "unknown"),
             confidence=result.get("confidence", 0.0),
             reason=result.get("reason", "llm_classification"),
             cleaned_text=cleaned,
         )
-    except Exception:
-        return NormalizedResult("unknown", 0.0, "llm_parse_error", cleaned)
-
+    except Exception as e:
+        return NormalizedResult("unknown", 0.0, f"llm_parse_error: {e}", cleaned)
