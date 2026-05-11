@@ -1,8 +1,9 @@
 # normalizer.py
+import os
+import json
 from dataclasses import dataclass
-import re
 from typing import Optional
-
+import anthropic
 
 @dataclass(frozen=True)
 class NormalizedResult:
@@ -12,55 +13,48 @@ class NormalizedResult:
     cleaned_text: str
 
 
-_STRONG_ON = [
-    "turn on",
-    "switch on",
-    "light on",
-    "turn the light on",
-]
-
-_STRONG_OFF = [
-    "turn off",
-    "switch off",
-    "light off",
-    "turn the light off",
-]
-
-_NEGATIONS = ["don't", "dont", "do not", "not"]
-
-
-def _preprocess(text: str) -> str:
-    text = text.lower().strip()
-    text = re.sub(r"[^\w\s']+", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
-
-
 def normalize_command(raw_text: Optional[str]) -> NormalizedResult:
     if not raw_text or not raw_text.strip():
         return NormalizedResult("unknown", 0.0, "empty_input", "")
 
-    cleaned = _preprocess(raw_text)
+    cleaned = raw_text.lower().strip()
 
-    has_neg = any(n in cleaned for n in _NEGATIONS)
-    on_hit = any(p in cleaned for p in _STRONG_ON)
-    off_hit = any(p in cleaned for p in _STRONG_OFF)
+    client = anthropic.Anthropic(
+        api_key=os.environ.get("ANTHROPIC_API_KEY")
+    )
 
-    # 冲突
-    if on_hit and off_hit:
-        return NormalizedResult("unknown", 0.0, "conflict", cleaned)
+    message = client.messages.create(
+        model="claude-sonnet-4-5",
+        max_tokens=100,
+        messages=[
+            {
+                "role": "user",
+                "content": f"""You are a smart home assistant. The user just gave a voice command.
+Your job is to classify the command into one of three categories:
+- "on": user wants to turn the light ON
+- "off": user wants to turn the light OFF  
+- "unknown": command is unclear, unrelated, or contradictory
 
-    # 否定保护
-    if has_neg and on_hit:
-        return NormalizedResult("unknown", 0.0, "negated_on", cleaned)
+User said: "{raw_text}"
 
-    if has_neg and off_hit:
-        return NormalizedResult("unknown", 0.0, "negated_off", cleaned)
+Reply with ONLY a JSON object in this exact format, nothing else:
+{{"command": "on", "confidence": 0.95, "reason": "user explicitly asked to turn light on"}}"""
+            }
+        ]
+    )
 
-    if on_hit:
-        return NormalizedResult("on", 0.9, "strong_phrase_on", cleaned)
-
-    if off_hit:
-        return NormalizedResult("off", 0.9, "strong_phrase_off", cleaned)
-
-    return NormalizedResult("unknown", 0.0, "no_match", cleaned)
+    try:
+        text = message.content[0].text.strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        result = json.loads(text.strip())
+        return NormalizedResult(
+            normalized=result.get("command", "unknown"),
+            confidence=result.get("confidence", 0.0),
+            reason=result.get("reason", "llm_classification"),
+            cleaned_text=cleaned,
+        )
+    except Exception as e:
+        return NormalizedResult("unknown", 0.0, f"llm_parse_error: {e}", cleaned)
